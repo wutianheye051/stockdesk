@@ -7,7 +7,19 @@ import { Prisma } from "@/generated/prisma/client";
 import { MovementType } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireEditor } from "@/lib/session";
-import { fieldErrors, invalid, type FormState } from "@/lib/form";
+import { failed, fieldErrors, formValues, invalid, type FormState } from "@/lib/form";
+
+/** 失敗時に画面へ返して再表示する項目 */
+const PRODUCT_FIELDS = [
+  "sku",
+  "name",
+  "categoryId",
+  "supplierId",
+  "costPrice",
+  "unitPrice",
+  "reorderPoint",
+  "isActive",
+] as const;
 
 /** select の未選択（""）は null に、数値入力は number にする */
 const optionalId = z.preprocess(
@@ -31,7 +43,6 @@ const productSchema = z.object({
   isActive: z.preprocess((v) => v === "on" || v === "true" || v === true, z.boolean()),
 });
 
-/** 入力値をそのまま返して再表示できるようにする（入力し直しをさせない） */
 function parse(formData: FormData) {
   return productSchema.safeParse({
     sku: formData.get("sku"),
@@ -58,7 +69,7 @@ export async function createProduct(
 
   const parsed = parse(formData);
   if (!parsed.success) {
-    return invalid(fieldErrors(parsed.error));
+    return invalid(fieldErrors(parsed.error), formValues(formData, PRODUCT_FIELDS));
   }
 
   let newId: number;
@@ -67,7 +78,10 @@ export async function createProduct(
     newId = created.id;
   } catch (e) {
     if (isDuplicateSku(e)) {
-      return { ok: false, errors: { sku: "この SKU は既に登録されています" } };
+      return invalid(
+        { sku: "この SKU は既に登録されています" },
+        formValues(formData, PRODUCT_FIELDS),
+      );
     }
     throw e;
   }
@@ -89,7 +103,7 @@ export async function updateProduct(
 
   const parsed = parse(formData);
   if (!parsed.success) {
-    return invalid(fieldErrors(parsed.error));
+    return invalid(fieldErrors(parsed.error), formValues(formData, PRODUCT_FIELDS));
   }
 
   try {
@@ -97,7 +111,10 @@ export async function updateProduct(
     await prisma.product.update({ where: { id }, data: parsed.data });
   } catch (e) {
     if (isDuplicateSku(e)) {
-      return { ok: false, errors: { sku: "この SKU は既に登録されています" } };
+      return invalid(
+        { sku: "この SKU は既に登録されています" },
+        formValues(formData, PRODUCT_FIELDS),
+      );
     }
     throw e;
   }
@@ -106,6 +123,8 @@ export async function updateProduct(
   revalidatePath(`/products/${id}`);
   return { ok: true, message: "保存しました。" };
 }
+
+const STOCK_FIELDS = ["type", "qty", "reason"] as const;
 
 const stockSchema = z.object({
   productId: z.coerce.number().int().positive(),
@@ -133,7 +152,7 @@ export async function adjustStock(
     reason: formData.get("reason"),
   });
   if (!parsed.success) {
-    return invalid(fieldErrors(parsed.error));
+    return invalid(fieldErrors(parsed.error), formValues(formData, STOCK_FIELDS));
   }
 
   const { productId, type, qty, reason } = parsed.data;
@@ -169,7 +188,10 @@ export async function adjustStock(
       await tx.product.update({ where: { id: productId }, data: { stockQty: next } });
     });
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : "在庫の更新に失敗しました。" };
+    return failed(
+      e instanceof Error ? e.message : "在庫の更新に失敗しました。",
+      formValues(formData, STOCK_FIELDS),
+    );
   }
 
   revalidatePath("/products");

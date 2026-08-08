@@ -48,19 +48,25 @@ export default function ProductForm({
   const [state, formAction] = useActionState(action, initialFormState);
   const err = state.errors ?? {};
 
+  // 失敗して戻ってきたときは送信値を、それ以外は既存データを初期値にする。
+  // 非制御コンポーネントは再レンダーだけでは値が変わらないので、下の grid を nonce で再マウントさせる。
+  const sent = state.values;
+  const def = (key: string, fallback: string | number | null | undefined) =>
+    sent ? (sent[key] ?? "") : (fallback ?? "");
+
   return (
     <form action={formAction} className="space-y-5">
       {initial?.id !== undefined && <input type="hidden" name="id" value={initial.id} />}
 
       {state.message && <Alert tone={state.ok ? "info" : "error"}>{state.message}</Alert>}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div key={state.nonce ?? 0} className="grid gap-4 sm:grid-cols-2">
         <Field label="SKU" error={err.sku} hint="半角英数字と . _ - のみ。登録後の変更は履歴に影響します">
           <input
             name="sku"
             required
             disabled={readOnly}
-            defaultValue={initial?.sku ?? ""}
+            defaultValue={def("sku", initial?.sku)}
             className={input}
             placeholder="SKU-0001"
           />
@@ -71,7 +77,7 @@ export default function ProductForm({
             name="name"
             required
             disabled={readOnly}
-            defaultValue={initial?.name ?? ""}
+            defaultValue={def("name", initial?.name)}
             className={input}
           />
         </Field>
@@ -80,7 +86,7 @@ export default function ProductForm({
           <select
             name="categoryId"
             disabled={readOnly}
-            defaultValue={initial?.categoryId ?? ""}
+            defaultValue={def("categoryId", initial?.categoryId)}
             className={input}
           >
             <option value="">未設定</option>
@@ -96,7 +102,7 @@ export default function ProductForm({
           <select
             name="supplierId"
             disabled={readOnly}
-            defaultValue={initial?.supplierId ?? ""}
+            defaultValue={def("supplierId", initial?.supplierId)}
             className={input}
           >
             <option value="">未設定</option>
@@ -116,7 +122,7 @@ export default function ProductForm({
             step={1}
             required
             disabled={readOnly}
-            defaultValue={initial?.costPrice ?? 0}
+            defaultValue={def("costPrice", initial?.costPrice ?? 0)}
             className={`${input} tabular`}
           />
         </Field>
@@ -129,7 +135,7 @@ export default function ProductForm({
             step={1}
             required
             disabled={readOnly}
-            defaultValue={initial?.unitPrice ?? 0}
+            defaultValue={def("unitPrice", initial?.unitPrice ?? 0)}
             className={`${input} tabular`}
           />
         </Field>
@@ -146,7 +152,7 @@ export default function ProductForm({
             step={1}
             required
             disabled={readOnly}
-            defaultValue={initial?.reorderPoint ?? 0}
+            defaultValue={def("reorderPoint", initial?.reorderPoint ?? 0)}
             className={`${input} tabular`}
           />
         </Field>
@@ -157,7 +163,7 @@ export default function ProductForm({
               type="checkbox"
               name="isActive"
               disabled={readOnly}
-              defaultChecked={initial?.isActive ?? true}
+              defaultChecked={sent ? sent.isActive === "on" : (initial?.isActive ?? true)}
               className="size-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
             />
             <span className="text-sm text-zinc-700">取扱中（外すと廃番として扱う）</span>

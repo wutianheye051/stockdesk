@@ -25,14 +25,19 @@ export default function StockAdjustForm({
 }) {
   const [state, formAction] = useActionState(action, initialFormState);
 
+  // 在庫不足で弾かれたときに区分・数量・理由を打ち直させない
+  const sent = state.values;
+  const def = (key: string, fallback: string) => sent?.[key] ?? fallback;
+
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="productId" value={productId} />
 
       {state.message && <Alert tone={state.ok ? "info" : "error"}>{state.message}</Alert>}
 
+      <div key={state.nonce ?? 0} className="space-y-4">
       <Field label="区分">
-        <select name="type" defaultValue="IN" className={input}>
+        <select name="type" defaultValue={def("type", "IN")} className={input}>
           <option value="IN">入庫（現在庫に加算）</option>
           <option value="OUT">出庫（現在庫から減算）</option>
           <option value="ADJUST">棚卸調整（実数で置き換え）</option>
@@ -50,14 +55,21 @@ export default function StockAdjustForm({
           min={1}
           step={1}
           required
-          defaultValue={1}
+          defaultValue={def("qty", "1")}
           className={`${input} tabular`}
         />
       </Field>
 
       <Field label="理由" hint="任意。棚卸・破損・返品など、後から追える言葉で残します">
-        <input name="reason" maxLength={200} className={input} placeholder="例: 棚卸差異の修正" />
+        <input
+          name="reason"
+          maxLength={200}
+          defaultValue={def("reason", "")}
+          className={input}
+          placeholder="例: 棚卸差異の修正"
+        />
       </Field>
+      </div>
 
       <SubmitButton />
     </form>

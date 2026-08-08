@@ -37,6 +37,10 @@ export default function OrderForm({
   const [lines, setLines] = useState<Line[]>([{ key: 1, productId: "", qty: "1" }]);
   const err = state.errors ?? {};
 
+  // 失敗して戻ってきたら入力値を復元する（明細行は上の useState が保持している）
+  const sent = state.values;
+  const def = (key: string) => sent?.[key] ?? "";
+
   const byId = new Map(products.map((p) => [String(p.id), p]));
 
   const addLine = () =>
@@ -60,16 +64,28 @@ export default function OrderForm({
 
       <Card className="p-6">
         <h2 className="mb-4 text-sm font-semibold text-zinc-900">取引先</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div key={state.nonce ?? 0} className="grid gap-4 sm:grid-cols-2">
           <Field label="取引先名" error={err.customerName}>
-            <input name="customerName" required maxLength={120} className={input} />
+            <input
+              name="customerName"
+              required
+              maxLength={120}
+              defaultValue={def("customerName")}
+              className={input}
+            />
           </Field>
           <Field label="メールアドレス" error={err.customerEmail} hint="任意">
-            <input type="email" name="customerEmail" maxLength={200} className={input} />
+            <input
+              type="email"
+              name="customerEmail"
+              maxLength={200}
+              defaultValue={def("customerEmail")}
+              className={input}
+            />
           </Field>
           <div className="sm:col-span-2">
             <Field label="備考" error={err.note} hint="任意。納品時の指示など">
-              <input name="note" maxLength={500} className={input} />
+              <input name="note" maxLength={500} defaultValue={def("note")} className={input} />
             </Field>
           </div>
         </div>

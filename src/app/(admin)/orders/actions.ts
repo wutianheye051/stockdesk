@@ -7,7 +7,10 @@ import { Prisma } from "@/generated/prisma/client";
 import { MovementType, OrderStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireEditor } from "@/lib/session";
-import { fieldErrors, invalid, type FormState } from "@/lib/form";
+import { failed, fieldErrors, formValues, invalid, type FormState } from "@/lib/form";
+
+/** 失敗時に画面へ返して再表示する項目（明細行はクライアント側の state で保持される） */
+const ORDER_FIELDS = ["customerName", "customerEmail", "note"] as const;
 import { canTransition, isAllocated, statusLabel } from "@/lib/order-status";
 
 // ---------------------------------------------------------------- 受注登録
@@ -61,7 +64,9 @@ export async function createOrder(_prev: FormState, formData: FormData): Promise
     customerEmail: formData.get("customerEmail") ?? "",
     note: formData.get("note") ?? "",
   });
-  if (!parsed.success) return invalid(fieldErrors(parsed.error));
+  if (!parsed.success) {
+    return invalid(fieldErrors(parsed.error), formValues(formData, ORDER_FIELDS));
+  }
 
   const productIds = formData.getAll("productId").map((v) => Number(v));
   const quantities = formData.getAll("qty").map((v) => Number(v));
@@ -72,7 +77,10 @@ export async function createOrder(_prev: FormState, formData: FormData): Promise
 
   const itemsParsed = itemSchema.safeParse(rawItems);
   if (!itemsParsed.success) {
-    return { ok: false, message: itemsParsed.error.issues[0]?.message ?? "明細が不正です。" };
+    return failed(
+      itemsParsed.error.issues[0]?.message ?? "明細が不正です。",
+      formValues(formData, ORDER_FIELDS),
+    );
   }
   const items = mergeItems(itemsParsed.data);
 
@@ -113,7 +121,10 @@ export async function createOrder(_prev: FormState, formData: FormData): Promise
       return order.id;
     });
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : "受注の登録に失敗しました。" };
+    return failed(
+      e instanceof Error ? e.message : "受注の登録に失敗しました。",
+      formValues(formData, ORDER_FIELDS),
+    );
   }
 
   revalidatePath("/orders");
