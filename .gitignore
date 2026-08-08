@@ -47,3 +47,12 @@ next-env.d.ts
 # ローカル起動時のログ
 .dev.log
 .prisma-dev.log
+
+# コーディングエージェント用の自動生成ファイル。
+# ツールが勝手に作るものでプロジェクトの成果物ではないため、リポジトリには含めない。
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
+AGENTS.md
+CLAUDE.md
