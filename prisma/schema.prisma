@@ -1,0 +1,146 @@
+// StockDesk — 受注・在庫管理の管理画面
+// 金額はすべて「円（整数）」で保持する。JPY に小数は存在しないため Decimal を使わない。
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN // 全操作＋ユーザー管理
+  STAFF // 商品・受注・在庫の登録／更新
+  VIEWER // 閲覧とCSV出力のみ
+}
+
+enum OrderStatus {
+  PENDING // 受付済（在庫引当前）
+  CONFIRMED // 確定（在庫引当済）
+  SHIPPED // 出荷済
+  CANCELLED // キャンセル（引当を戻す）
+}
+
+enum MovementType {
+  IN // 入庫
+  OUT // 出庫
+  ADJUST // 棚卸調整
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(STAFF)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders     Order[]
+  stockMoves StockMovement[]
+
+  @@map("users")
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
+
+  @@map("categories")
+}
+
+model Supplier {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  contact  String?
+  products Product[]
+
+  @@map("suppliers")
+}
+
+model Product {
+  id           Int      @id @default(autoincrement())
+  sku          String   @unique
+  name         String
+  categoryId   Int?
+  supplierId   Int?
+  unitPrice    Int // 販売単価（円）
+  costPrice    Int // 仕入単価（円）
+  stockQty     Int      @default(0) // 現在庫数（StockMovement の積み上げ結果）
+  reorderPoint Int      @default(0) // 発注点。stockQty がこれを下回ると要発注
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category   Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  supplier   Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  orderItems OrderItem[]
+  stockMoves StockMovement[]
+
+  // 一覧の既定ソートと絞り込みに効かせる
+  @@index([name])
+  @@index([categoryId])
+  @@index([isActive, stockQty])
+  @@map("products")
+}
+
+model Order {
+  id            Int         @id @default(autoincrement())
+  orderNo       String      @unique // 例: SO-2026-0001
+  customerName  String
+  customerEmail String?
+  status        OrderStatus @default(PENDING)
+  totalAmount   Int         @default(0) // 明細の合計（円）。保存時に再計算する
+  note          String?
+  orderedAt     DateTime    @default(now())
+  shippedAt     DateTime?
+  createdById   String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  createdBy  User            @relation(fields: [createdById], references: [id])
+  items      OrderItem[]
+  stockMoves StockMovement[]
+
+  @@index([status, orderedAt])
+  @@index([customerName])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        Int @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  qty       Int
+  unitPrice Int // 受注時点の単価を焼き込む（商品マスタの値上げに引きずられないため）
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, productId])
+  @@map("order_items")
+}
+
+// 在庫の増減はすべてここに残す。Product.stockQty は本テーブルの積み上げ結果であり、
+// 直接更新せず必ずトランザクション内で movement と同時に更新する。
+model StockMovement {
+  id          Int          @id @default(autoincrement())
+  productId   Int
+  type        MovementType
+  qty         Int // 符号なし。増減の向きは type で表す
+  reason      String?
+  orderId     Int?
+  createdById String
+  createdAt   DateTime     @default(now())
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order     Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  @@index([productId, createdAt])
+  @@map("stock_movements")
+}

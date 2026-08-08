@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), "Hiragino Kaku Gothic ProN", "Yu Gothic",
+    "Meiryo", system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "SFMono-Regular", Consolas, monospace;
+}
+
+/*
+ * 管理画面は業務中ずっと開かれる想定なので、OS のダークモード設定に追従させず
+ * ライト固定にしている。帳票の色（在庫警告の赤など）の見え方を一定に保つため。
+ */
+body {
+  @apply bg-zinc-50 text-zinc-900;
+  font-family: var(--font-sans);
+}
+
+/* 数値列は等幅にして桁を揃える。金額・在庫数の見比べが一気に楽になる */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
