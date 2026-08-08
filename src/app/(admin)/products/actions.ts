@@ -53,7 +53,8 @@ export async function createProduct(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireEditor();
+  const guard = await requireEditor();
+  if (!guard.ok) return { ok: false, message: guard.message };
 
   const parsed = parse(formData);
   if (!parsed.success) {
@@ -80,7 +81,8 @@ export async function updateProduct(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireEditor();
+  const guard = await requireEditor();
+  if (!guard.ok) return { ok: false, message: guard.message };
 
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id)) return { ok: false, message: "商品が特定できませんでした。" };
@@ -120,7 +122,9 @@ export async function adjustStock(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const user = await requireEditor();
+  const guard = await requireEditor();
+  if (!guard.ok) return { ok: false, message: guard.message };
+  const user = guard.user;
 
   const parsed = stockSchema.safeParse({
     productId: formData.get("productId"),

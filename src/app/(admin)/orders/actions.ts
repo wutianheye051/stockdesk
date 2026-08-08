@@ -52,7 +52,9 @@ async function nextOrderNo(tx: Prisma.TransactionClient): Promise<string> {
 }
 
 export async function createOrder(_prev: FormState, formData: FormData): Promise<FormState> {
-  const user = await requireEditor();
+  const guard = await requireEditor();
+  if (!guard.ok) return { ok: false, message: guard.message };
+  const user = guard.user;
 
   const parsed = orderSchema.safeParse({
     customerName: formData.get("customerName"),
@@ -133,7 +135,9 @@ const statusSchema = z.object({
  *   PENDING   → CANCELLED : 在庫は動かさない
  */
 export async function changeOrderStatus(_prev: FormState, formData: FormData): Promise<FormState> {
-  const user = await requireEditor();
+  const guard = await requireEditor();
+  if (!guard.ok) return { ok: false, message: guard.message };
+  const user = guard.user;
 
   const parsed = statusSchema.safeParse({
     orderId: formData.get("orderId"),
