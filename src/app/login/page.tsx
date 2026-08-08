@@ -16,17 +16,33 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
   async function login(formData: FormData) {
     "use server";
+
+    // signIn に遷移を任せない（redirect: false）。
+    // 任せると失敗時も Auth.js 自身が pages.signIn へリダイレクトしてしまい、
+    // こちらでエラー表示に切り替える余地がなくなる（「失敗しても何も出ない」状態になる）。
+    //
+    // なお この版の signIn は認証失敗を例外で投げず、遷移先URLを文字列で返す。
+    // 失敗時のURLには error パラメータが付くので、それで判定する。
+    // セッションCookieは redirect の指定に関係なく signIn 内で設定されるため、
+    // redirect: false にしてもログイン自体は成立する。
+    let ok = false;
     try {
-      await signIn("credentials", {
+      const result = await signIn("credentials", {
         email: String(formData.get("email") ?? ""),
         password: String(formData.get("password") ?? ""),
-        redirectTo: "/",
+        redirect: false,
       });
+      ok =
+        typeof result === "string" &&
+        !new URL(result, "http://localhost").searchParams.has("error");
     } catch (error) {
-      // signIn は成功時に redirect を throw するので、それは握りつぶさず再送出する
-      if (error instanceof AuthError) redirect("/login?error=1");
-      throw error;
+      // AuthError 以外（想定外の不具合）は握りつぶさず、そのまま出す
+      if (!(error instanceof AuthError)) throw error;
+      ok = false;
     }
+
+    // redirect() は例外を投げるので try の外で呼ぶ
+    redirect(ok ? "/" : "/login?error=1");
   }
 
   return (
