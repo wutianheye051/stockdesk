@@ -148,8 +148,36 @@ npm run dev
 | `npm run build` | 本番ビルド（型チェックを含む） |
 | `npm test` | 単体テスト |
 | `npm run db:up` | ローカル PostgreSQL を起動 |
+| `npm run db:down` | ローカル PostgreSQL を停止 |
+| `npm run db:deploy` | 既存のマイグレーションを適用（本番向け） |
 | `npm run db:seed` | デモデータを投入 |
 | `npm run db:reset` | DB を作り直してシードまで実行 |
+
+---
+
+## デプロイ（Vercel + Neon）
+
+`src/generated/prisma` はリポジトリに含めていないため、`build` スクリプトで `prisma generate` を実行しています。
+Vercel 側は追加設定なしでビルドできます。
+
+必要な環境変数は2つだけです。
+
+| 変数 | 値 |
+|---|---|
+| `DATABASE_URL` | Neon の **Pooled connection** 文字列（ホスト名に `-pooler` が入っている方） |
+| `AUTH_SECRET` | `npx auth secret` で生成した値。**ローカルとは別の値にする** |
+
+サーバーレス環境では実行単位ごとに接続プールができるため、
+`src/lib/prisma.ts` で `max: 10` / `idleTimeoutMillis: 1000` を指定し、
+プーラー側が先に接続を切って `Connection terminated unexpectedly` になるのを避けています。
+
+マイグレーションとデモデータの投入は、ローカルから本番 DB を指して一度だけ実行します。
+
+```bash
+# 一時的に本番 DB を指す（Direct connection 文字列を使う）
+DATABASE_URL="postgresql://...neon.tech/...?sslmode=require" npx prisma migrate deploy
+DATABASE_URL="postgresql://...neon.tech/...?sslmode=require" npm run db:seed
+```
 
 ---
 
